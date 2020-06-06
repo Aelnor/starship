@@ -1,6 +1,10 @@
+#[cfg(target_os = "windows")]
+use super::utils::directory_win;
 use path_slash::PathExt;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "windows"))]
+use std::process::Command;
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::{Context, Module};
@@ -104,9 +108,46 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         },
     );
 
+    if is_readonly_dir(current_dir.to_str()?) {
+        module.create_segment(
+            "read_only_symbol",
+            &config
+                .read_only_symbol
+                .with_style(Some(config.read_only_symbol_style)),
+        );
+    }
+
     module.get_prefix().set_value(config.prefix);
 
     Some(module)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_readonly_dir(path: &str) -> bool {
+    let child = Command::new("sh")
+        .arg("-c")
+        .arg(format!("if [ ! -w {} ]; then exit 1; fi", path))
+        .status()
+        .expect("Failed!");
+    match child.code() {
+        Some(1) => return true,
+        _ => return false,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn is_readonly_dir(path: &str) -> bool {
+    match directory_win::is_write_allowed(path) {
+        Ok(res) => return !res,
+        Err(e) => {
+            log::debug!(
+                "Failed to detemine read only status of directory '{}': {}",
+                path,
+                e
+            );
+            return false;
+        }
+    }
 }
 
 /// Contract the root component of a path

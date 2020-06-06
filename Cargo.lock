@@ -1149,6 +1149,7 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width",
  "urlencoding",
+ "winapi",
  "yaml-rust",
 ]
 
